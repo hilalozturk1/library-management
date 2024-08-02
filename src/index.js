@@ -15,6 +15,8 @@ const validateBook = require("./validators/bookValidator");
 const validateBorrow = require("./validators/borrowValidator");
 const validateReturnBook = require("./validators/returnBookValidator");
 
+const updateAverageScore = require("./services/updateBookScores");
+
 app.use(express.json());
 
 const connection = async () => {
@@ -197,58 +199,63 @@ connection().then(() => {
   });
 
   // Endpoint to return a book and give a rating
-  app.post("/users/:userId/return/:bookId", async (req, res) => {
-    try {
-      const { userId, bookId } = req.params;
-      const { score } = req.body;
+  app.post("/users/:userId/return/:bookId", (req, res) => {
+    const { userId, bookId } = req.params;
+    const { score } = req.body;
 
-      const { error } = validateReturnBook({
-        userId: parseInt(userId),
-        bookId: parseInt(bookId),
-        score,
-      });
+    // Validate input
+    const { error } = validateReturnBook({
+      userId: parseInt(userId),
+      bookId: parseInt(bookId),
+      score,
+    });
 
-      if (error) {
-        return res.status(400).json({ message: error.details[0].message });
-      }
-
-      const user = await User.findByPk(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const book = await Book.findByPk(bookId);
-      if (!book) {
-        return res.status(404).json({ message: "Book not found" });
-      }
-
-      // Find the borrow record
-      const borrowRecord = await Borrow.findOne({
-        where: {
-          userId,
-          bookId,
-          returnDate: null,
-        },
-      });
-
-      if (!borrowRecord) {
-        return res
-          .status(404)
-          .json({ message: "Borrow record not found or the book has already been returned" });
-      }
-
-      // Update the borrow record with the return date and score
-      borrowRecord.returnDate = new Date(); // Get current date
-      borrowRecord.userScore = score;
-
-      await borrowRecord.save();
-
-      res.status(200).json(borrowRecord);
-    } catch (err) {
-      res
-        .status(500)
-        .json({ message: "Error returning book and giving a rating", error: err.message });
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
     }
+
+    User.findByPk(userId)
+      .then((user) => {
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        return Book.findByPk(bookId);
+      })
+      .then((book) => {
+        if (!book) {
+          return res.status(404).json({ message: "Book not found" });
+        }
+        return Borrow.findOne({
+          where: {
+            userId,
+            bookId,
+            returnDate: null,
+          },
+        });
+      })
+      .then((borrowRecord) => {
+        if (!borrowRecord) {
+          return res
+            .status(404)
+            .json({ message: "Borrow record not found or the book has already been returned" });
+        }
+
+        // Update the borrow record with the return date and score
+        borrowRecord.returnDate = new Date(); // Set current date
+        borrowRecord.userScore = score;
+
+        return borrowRecord.save();
+      })
+      .then(() => updateAverageScore(bookId))
+      .then(() => {
+        res.status(200).json({ message: "Book returned successfully" });
+      })
+      .catch((err) => {
+        console.error("Error:", err);
+        res
+          .status(500)
+          .json({ message: "Error returning book and giving a rating", error: err.message });
+      });
   });
 
   app.listen(port, () => {
