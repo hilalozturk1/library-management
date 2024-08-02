@@ -160,42 +160,55 @@ connection().then(() => {
   });
 
   // Endpoint to borrow a book
-  app.post("/users/:userId/borrow/:bookId", async (req, res) => {
-    try {
-      const { userId, bookId } = req.params;
+  app.post("/users/:userId/borrow/:bookId", (req, res) => {
+    const { userId, bookId } = req.params;
+    const { error } = validateBorrow({ userId, bookId });
 
-      // Validate the request parameters using the validator
-      const { error } = validateBorrow({ userId, bookId });
-
-      // If validation fails, return a 400 Bad Request response
-      if (error) {
-        return res.status(400).json({ message: error.details[0].message });
-      }
-
-      // Check if the user exists
-      const user = await User.findByPk(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Check if the book exists
-      const book = await Book.findByPk(bookId);
-      if (!book) {
-        return res.status(404).json({ message: "Book not found" });
-      }
-
-      // Create a new borrow record
-      const newBorrow = await Borrow.create({
-        userId,
-        bookId,
-        returnDate: null, // Null means the book has not been returned yet
-        userScore: null, // Null until the user rates the book
-      });
-
-      res.status(201).json(newBorrow);
-    } catch (err) {
-      res.status(500).json({ message: "Error borrowing book", error: err.message });
+    // If validation fails, return a 400 Bad Request response
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
     }
+
+    User.findByPk(userId)
+      .then((user) => {
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        return Book.findByPk(bookId).then((book) => {
+          if (!book) {
+            return res.status(404).json({ message: "Book not found" });
+          }
+
+          // Check if the user has any unreturned books
+          return Borrow.findOne({
+            where: {
+              userId,
+              returnDate: null, // This means the book has not been returned yet
+            },
+          }).then((unreturnedBorrow) => {
+            // If the user has an unreturned book, return an error
+            if (unreturnedBorrow) {
+              return res
+                .status(400)
+                .json({ message: "The user has not returned a previous book yet" });
+            }
+
+            // Create a new borrow record
+            return Borrow.create({
+              userId,
+              bookId,
+              returnDate: null, // Null means the book has not been returned yet
+              userScore: null, // Null until the user rates the book
+            }).then((newBorrow) => {
+              res.status(201).json(newBorrow);
+            });
+          });
+        });
+      })
+      .catch((err) => {
+        res.status(500).json({ message: "Error borrowing book", error: err.message });
+      });
   });
 
   // Endpoint to return a book and give a rating
