@@ -13,6 +13,7 @@ const Borrow = require("./models/Borrow");
 const validateUser = require("./validators/userValidator");
 const validateBook = require("./validators/bookValidator");
 const validateBorrow = require("./validators/borrowValidator");
+const validateReturnBook = require("./validators/returnBookValidator");
 
 app.use(express.json());
 
@@ -192,6 +193,61 @@ connection().then(() => {
       res.status(201).json(newBorrow);
     } catch (err) {
       res.status(500).json({ message: "Error borrowing book", error: err.message });
+    }
+  });
+
+  // Endpoint to return a book and give a rating
+  app.post("/users/:userId/return/:bookId", async (req, res) => {
+    try {
+      const { userId, bookId } = req.params;
+      const { score } = req.body;
+
+      const { error } = validateReturnBook({
+        userId: parseInt(userId),
+        bookId: parseInt(bookId),
+        score,
+      });
+
+      if (error) {
+        return res.status(400).json({ message: error.details[0].message });
+      }
+
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const book = await Book.findByPk(bookId);
+      if (!book) {
+        return res.status(404).json({ message: "Book not found" });
+      }
+
+      // Find the borrow record
+      const borrowRecord = await Borrow.findOne({
+        where: {
+          userId,
+          bookId,
+          returnDate: null,
+        },
+      });
+
+      if (!borrowRecord) {
+        return res
+          .status(404)
+          .json({ message: "Borrow record not found or the book has already been returned" });
+      }
+
+      // Update the borrow record with the return date and score
+      borrowRecord.returnDate = new Date(); // Get current date
+      borrowRecord.userScore = score;
+
+      await borrowRecord.save();
+
+      res.status(200).json(borrowRecord);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: "Error returning book and giving a rating", error: err.message });
     }
   });
 
