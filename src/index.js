@@ -7,6 +7,7 @@ const sequelize = require("./config/database");
 
 const User = require("./models/User");
 const Book = require("./models/Book");
+const Borrow = require("./models/Borrow");
 
 app.use(express.json());
 
@@ -46,6 +47,51 @@ connection().then(() => {
       res.status(200).json(books);
     } catch (err) {
       res.status(500).json({ message: "Error fetching users" });
+    }
+  });
+
+  app.get("/users/:id", async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const user = await User.findByPk(userId, {
+        include: {
+          model: Borrow,
+          include: Book,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const pastBooks = [];
+      const presentBooks = [];
+
+      user.Borrows.forEach((borrow) => {
+        if (borrow.returnDate) {
+          pastBooks.push({
+            name: borrow.Book.name,
+            userScore: borrow.userScore,
+          });
+        } else {
+          presentBooks.push({
+            name: borrow.Book.name,
+          });
+        }
+      });
+
+      const result = {
+        id: user.id,
+        name: user.name,
+        books: {
+          past: pastBooks,
+          present: presentBooks,
+        },
+      };
+
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching user information" });
     }
   });
 
