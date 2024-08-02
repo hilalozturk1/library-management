@@ -10,6 +10,9 @@ const Book = require("./models/Book");
 const SingleBook = require("./models/SingleBook");
 const Borrow = require("./models/Borrow");
 
+const validateUser = require("./validators/userValidator");
+const validateBook = require("./validators/bookValidator");
+
 app.use(express.json());
 
 const connection = async () => {
@@ -28,8 +31,6 @@ const connection = async () => {
 };
 
 connection().then(() => {
-  const validateUser = require("./validators/userValidator");
-
   // Get Users
   app.get("/users", async (req, res) => {
     try {
@@ -133,6 +134,24 @@ connection().then(() => {
       res.status(200).json(response);
     } catch (err) {
       res.status(500).json({ message: "Error fetching book information" });
+    }
+  });
+
+  //create a new book
+  app.post("/books", async (req, res) => {
+    try {
+      const { error } = validateBook(req.body);
+      if (error) {
+        return res.status(400).json({ message: error.details[0].message });
+      }
+
+      const { name } = req.body;
+
+      const newBook = await Book.create({ name });
+
+      res.status(201).json(newBook);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating book", error: err.message });
     }
   });
 
