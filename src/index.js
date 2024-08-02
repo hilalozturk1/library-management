@@ -7,6 +7,7 @@ const sequelize = require("./config/database");
 
 const User = require("./models/User");
 const Book = require("./models/Book");
+const SingleBook = require("./models/SingleBook");
 const Borrow = require("./models/Borrow");
 
 app.use(express.json());
@@ -107,6 +108,31 @@ connection().then(() => {
       res.status(201).json(user);
     } catch (err) {
       res.status(500).json({ message: "Error creating user" });
+    }
+  });
+
+  //get single book
+  app.get("/books/:id", async (req, res) => {
+    try {
+      const bookId = req.params.id;
+      console.log("book is", bookId);
+
+      // Find book
+      const book = await SingleBook.findByPk(bookId);
+
+      if (!book) {
+        return res.status(404).json({ message: "Book not found" });
+      }
+
+      const response = {
+        id: book.id,
+        name: book.name,
+        score: book.averageScore !== null ? book.averageScore.toFixed(2) : -1,
+      };
+
+      res.status(200).json(response);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching book information" });
     }
   });
 
