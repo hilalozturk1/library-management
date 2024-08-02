@@ -12,6 +12,7 @@ const Borrow = require("./models/Borrow");
 
 const validateUser = require("./validators/userValidator");
 const validateBook = require("./validators/bookValidator");
+const validateBorrow = require("./validators/borrowValidator");
 
 app.use(express.json());
 
@@ -152,6 +153,45 @@ connection().then(() => {
       res.status(201).json(newBook);
     } catch (err) {
       res.status(500).json({ message: "Error creating book", error: err.message });
+    }
+  });
+
+  // Endpoint to borrow a book
+  app.post("/users/:userId/borrow/:bookId", async (req, res) => {
+    try {
+      const { userId, bookId } = req.params;
+
+      // Validate the request parameters using the validator
+      const { error } = validateBorrow({ userId, bookId });
+
+      // If validation fails, return a 400 Bad Request response
+      if (error) {
+        return res.status(400).json({ message: error.details[0].message });
+      }
+
+      // Check if the user exists
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if the book exists
+      const book = await Book.findByPk(bookId);
+      if (!book) {
+        return res.status(404).json({ message: "Book not found" });
+      }
+
+      // Create a new borrow record
+      const newBorrow = await Borrow.create({
+        userId,
+        bookId,
+        returnDate: null, // Null means the book has not been returned yet
+        userScore: null, // Null until the user rates the book
+      });
+
+      res.status(201).json(newBorrow);
+    } catch (err) {
+      res.status(500).json({ message: "Error borrowing book", error: err.message });
     }
   });
 
