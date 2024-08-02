@@ -95,6 +95,21 @@ connection().then(() => {
     }
   });
 
+  // Create a new user
+  app.post("/users", async (req, res) => {
+    try {
+      const { error } = validateUser(req.body);
+      if (error) {
+        return res.status(400).json({ message: error.details[0].message });
+      }
+
+      const user = await User.create({ name: req.body.name });
+      res.status(201).json(user);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating user" });
+    }
+  });
+
   app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
   });
