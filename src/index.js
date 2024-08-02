@@ -5,15 +5,8 @@ const port = process.env.PORT || 3000;
 const app = express();
 const sequelize = require("./config/database");
 
-const User = require("./models/User");
-const Book = require("./models/Book");
-const SingleBook = require("./models/SingleBook");
-const Borrow = require("./models/Borrow");
-
-const validateUser = require("./validators/userValidator");
-const validateBook = require("./validators/bookValidator");
-const validateBorrow = require("./validators/borrowValidator");
-const validateReturnBook = require("./validators/returnBookValidator");
+const { User, Book, SingleBook, Borrow } = require("./models");
+const { validateUser, validateBook, validateBorrow, validateReturnBook } = require("./validators");
 
 const updateAverageScore = require("./services/updateBookScores");
 
@@ -39,7 +32,7 @@ connection().then(() => {
   app.get("/users", async (req, res) => {
     try {
       const users = await User.findAll();
-      console.log(users);
+
       res.status(200).json(users);
     } catch (err) {
       res.status(500).json({ message: "Error fetching users" });
@@ -120,7 +113,6 @@ connection().then(() => {
   app.get("/books/:id", async (req, res) => {
     try {
       const bookId = req.params.id;
-      console.log("book is", bookId);
 
       // Find book
       const book = await SingleBook.findByPk(bookId);
